@@ -1,0 +1,901 @@
+```html
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>時計つき読解問題ジェネレーター（JSON→表示＋時計描画）</title>
+  <style>
+    :root{
+      --bg:#f6fbff;
+      --card:#ffffff;
+      --text:#183247;
+      --muted:#5c7488;
+      --accent:#2f92d0;
+      --ok:#1f9d5a;
+      --warn:#d85b49;
+      --border:rgba(24,50,71,.12);
+      --shadow:0 10px 24px rgba(24,50,71,.12);
+      --radius:18px;
+      --pad:14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --jp: "Noto Sans JP","BIZ UDPGothic","Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--jp);
+      color:var(--text);
+      background:linear-gradient(180deg,#eff8ff 0%, #f8fff6 100%);
+      min-height:100dvh;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      background:rgba(246,251,255,.92);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--border);
+    }
+    .wrap{width:min(1100px,100%); margin:0 auto; padding:14px;}
+    .topbar{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+    }
+    .title{
+      font-weight:800;
+      letter-spacing:.02em;
+      font-size:18px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .pill{
+      font-size:12px; color:var(--muted);
+      border:1px solid var(--border);
+      padding:4px 10px; border-radius:999px;
+      background:#fff;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap:14px;
+      align-items:start;
+      padding-bottom:20px;
+    }
+    @media (max-width: 980px){
+      .grid{grid-template-columns:1fr; }
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .card h2{
+      margin:0;
+      padding:12px 14px;
+      font-size:14px;
+      color:var(--muted);
+      border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg,#ffffff 0%, #fbfdff 100%);
+    }
+    .card .content{padding:14px;}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .btn{
+      appearance:none; border:none; cursor:pointer;
+      background:var(--accent); color:#fff;
+      padding:10px 12px; border-radius:12px;
+      font-weight:800; letter-spacing:.02em;
+      box-shadow:0 8px 18px rgba(47,146,208,.24);
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn.secondary{
+      background:#fff; color:var(--text);
+      border:1px solid var(--border);
+      box-shadow:none;
+    }
+    .btn.danger{
+      background:var(--warn);
+      box-shadow:0 8px 18px rgba(216,91,73,.22);
+    }
+    .btn.ok{
+      background:var(--ok);
+      box-shadow:0 8px 18px rgba(31,157,90,.20);
+    }
+    textarea{
+      width:100%;
+      min-height:280px;
+      resize:vertical;
+      font-family:var(--mono);
+      font-size:12.5px;
+      line-height:1.45;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      outline:none;
+      background:#fbfdff;
+      color:#0f2a3d;
+    }
+    .hint{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:12.5px;
+      line-height:1.5;
+    }
+    .error{
+      margin-top:10px;
+      color:#9c2f25;
+      background:rgba(216,91,73,.12);
+      border:1px solid rgba(216,91,73,.25);
+      padding:10px 12px;
+      border-radius:12px;
+      display:none;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+
+    /* output */
+    .outTitle{
+      font-size:20px;
+      font-weight:900;
+      margin:0 0 6px 0;
+      letter-spacing:.02em;
+    }
+    .outSituation{
+      margin:0 0 14px 0;
+      color:var(--muted);
+      line-height:1.6;
+      font-size:14px;
+    }
+    table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:#fff;
+    }
+    th, td{
+      padding:10px 10px;
+      border-bottom:1px solid var(--border);
+      vertical-align:top;
+      font-size:14px;
+      line-height:1.5;
+    }
+    th{
+      background:#f2f8ff;
+      color:#21405a;
+      font-weight:800;
+      white-space:nowrap;
+    }
+    tr:last-child td{border-bottom:none;}
+    .qblock{
+      margin-top:14px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .qhead{
+      padding:10px 12px;
+      background:#fbfdff;
+      border-bottom:1px solid var(--border);
+      font-weight:900;
+    }
+    .qbody{padding:12px;}
+    .qtext{margin:0; line-height:1.7; font-size:15px;}
+    .choices{
+      margin-top:10px;
+      display:grid;
+      grid-template-columns:1fr;
+      gap:8px;
+    }
+    .choice{
+      border:1px dashed var(--border);
+      border-radius:12px;
+      padding:10px 12px;
+      background:#fff;
+    }
+
+    .canvasWrap{
+      margin-top:12px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .canvasTop{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px; flex-wrap:wrap;
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      background:#fbfdff;
+    }
+    .canvasTop .meta{
+      color:var(--muted);
+      font-size:12.5px;
+      line-height:1.5;
+    }
+    canvas{
+      width:100%;
+      height:auto;
+      display:block;
+      background:#fff;
+    }
+    .answers{
+      margin-top:14px;
+      border:1px solid rgba(31,157,90,.25);
+      background:rgba(31,157,90,.08);
+      border-radius:14px;
+      padding:12px;
+    }
+    .answers h3{
+      margin:0 0 8px 0;
+      font-size:14px;
+      font-weight:900;
+      color:#0f5b35;
+    }
+    .answers p{margin:0; line-height:1.7; font-size:14px;}
+
+    /* Print */
+    @media print{
+      header, .no-print{display:none !important;}
+      body{background:#fff;}
+      .wrap{width:100%; padding:0;}
+      .grid{grid-template-columns:1fr; gap:0;}
+      .card{
+        box-shadow:none;
+        border:none;
+        border-radius:0;
+      }
+      .card h2{display:none;}
+      .card .content{padding:0;}
+      .qblock, table, .canvasWrap, .answers{
+        box-shadow:none;
+        page-break-inside:avoid;
+      }
+      @page{
+        size: A4;
+        margin: 12mm;
+      }
+    }
+  </style>
+</head>
+<body>
+<header class="no-print">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">
+        時計つき読解問題ジェネレーター
+        <span class="pill">JSON貼り付け → 表示 → 時計4択を自動描画</span>
+      </div>
+      <div class="row">
+        <button class="btn secondary" id="btnSample">サンプルJSONを入れる</button>
+        <button class="btn ok" id="btnRender">表示する</button>
+        <button class="btn" id="btnShuffle">問3の選択肢を作り直す</button>
+        <button class="btn secondary" id="btnPrint">印刷</button>
+        <button class="btn danger" id="btnClear">消す</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="grid">
+    <!-- LEFT -->
+    <section class="card no-print">
+      <h2>① JSON入力</h2>
+      <div class="content">
+        <textarea id="jsonInput" spellcheck="false"></textarea>
+        <div class="hint">
+          ・GPTsで「JSONのみ出力」させた結果をここに貼ります。<br>
+          ・問3は <b>"q3_target_time": "HH:MM"</b> を必ず入れてください（例 "14:35"）。<br>
+          ・このツールが、正解＋ひっかけ3つを自動生成して、時計画像（ア〜エ）を1枚に描きます。
+        </div>
+        <div class="error" id="errBox"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT -->
+    <section class="card">
+      <h2>② 出力（問題＋時計）</h2>
+      <div class="content" id="output">
+        <p style="margin:0;color:var(--muted);line-height:1.7">
+          右上の「サンプルJSONを入れる」→「表示する」で、動作が確認できます。<br>
+          GPTsのJSONを貼ったら「表示する」を押してください。
+        </p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+  // ========= Utilities =========
+  const $ = (id) => document.getElementById(id);
+
+  function safeText(s){
+    if (s === null || s === undefined) return "";
+    return String(s);
+  }
+
+  function pad2(n){ return String(n).padStart(2,"0"); }
+
+  function parseHHMM(hhmm){
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || "").trim());
+    if(!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if(!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    if(hh<0 || hh>23 || mm<0 || mm>59) return null;
+    return {hh, mm};
+  }
+
+  function toMinutes(t){ return t.hh*60 + t.mm; }
+
+  function fromMinutes(min){
+    let m = ((min % (24*60)) + 24*60) % (24*60);
+    const hh = Math.floor(m/60);
+    const mm = m%60;
+    return {hh, mm};
+  }
+
+  function fmtHHMM(t){ return `${pad2(t.hh)}:${pad2(t.mm)}`; }
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  function uniqueTimes(times){
+    const seen = new Set();
+    const out = [];
+    for(const t of times){
+      const key = fmtHHMM(t);
+      if(!seen.has(key)){
+        seen.add(key);
+        out.push(t);
+      }
+    }
+    return out;
+  }
+
+  function showError(msg){
+    const box = $("errBox");
+    box.style.display = "block";
+    box.textContent = msg;
+  }
+  function clearError(){
+    const box = $("errBox");
+    box.style.display = "none";
+    box.textContent = "";
+  }
+
+  // ========= Q3 Choice Generation =========
+  // Make 1 correct + 3 plausible wrong times.
+  function generateQ3Choices(target){
+    // Target is {hh,mm}
+    // Wrong ideas:
+    // 1) swap hands-ish: interpret mm as hour-ish and hh as minute-ish (approx)
+    // 2) +1 hour
+    // 3) minute off by 5 or 10 (nearest tricky)
+    const baseMin = toMinutes(target);
+
+    // 1) "hands swapped" heuristic:
+    // - Treat minutes as hour position: hour' = floor(mm/5) (0-11)
+    // - Treat hour as minutes: minute' = (hh%12)*5 (0-55)
+    // Keep same AM/PM as base (roughly), by mapping to closest 24h time:
+    const swappedHour12 = Math.floor(target.mm / 5) % 12; // 0..11
+    const swappedMin = ((target.hh % 12) * 5) % 60;      // 0..55
+    // Choose swapped hour in 24h close to target.hh
+    // If target.hh is 12..23, prefer 12+swappedHour12 unless too far.
+    let swappedHh = swappedHour12;
+    if(target.hh >= 12) swappedHh = (swappedHour12 === 0 ? 12 : 12 + swappedHour12);
+    // If that equals 24, wrap:
+    swappedHh = swappedHh % 24;
+    const swapped = {hh: swappedHh, mm: swappedMin};
+
+    // 2) +1 hour
+    const plus1h = fromMinutes(baseMin + 60);
+
+    // 3) minute shift: +10 (if mm not near end) else -10
+    let minuteShift = 10;
+    if(target.mm >= 50) minuteShift = -10;
+    const minShift = fromMinutes(baseMin + minuteShift);
+
+    // 4) another wrong: -1 hour or +30 minutes depending on duplication
+    const altWrong = fromMinutes(baseMin - 60);
+
+    // Collect, ensure 4 unique; if duplicates occur, adjust with fallback offsets.
+    let candidates = uniqueTimes([target, swapped, plus1h, minShift, altWrong]);
+
+    // Ensure at least 4
+    const fallbackOffsets = [5, -5, 15, -15, 30, -30, 120, -120];
+    let k = 0;
+    while(candidates.length < 4 && k < fallbackOffsets.length){
+      candidates = uniqueTimes(candidates.concat([fromMinutes(baseMin + fallbackOffsets[k])]));
+      k++;
+    }
+    // Take first 4 with target included
+    // Guarantee target is included:
+    const hasTarget = candidates.some(t => fmtHHMM(t) === fmtHHMM(target));
+    if(!hasTarget) candidates.unshift(target);
+    candidates = uniqueTimes(candidates);
+
+    // Make exact 4: keep target + first 3 others
+    const others = candidates.filter(t => fmtHHMM(t) !== fmtHHMM(target));
+    const four = [target].concat(others.slice(0,3));
+
+    // Shuffle for A-D
+    const labels = ["ア","イ","ウ","エ"];
+    const shuffled = shuffle(four).map((t, idx) => ({ label: labels[idx], time: t }));
+    const correctLabel = shuffled.find(x => fmtHHMM(x.time) === fmtHHMM(target)).label;
+
+    return { choices: shuffled, correctLabel };
+  }
+
+  // ========= Clock Drawing =========
+  function drawClock(ctx, cx, cy, r, time, opts={}){
+    const hh = time.hh;
+    const mm = time.mm;
+    const showDigital = !!opts.showDigital;
+
+    // face
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // outer circle
+    ctx.beginPath();
+    ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, r*0.05);
+    ctx.strokeStyle = "rgba(24,50,71,.35)";
+    ctx.stroke();
+
+    // ticks
+    for(let i=0;i<60;i++){
+      const ang = (Math.PI*2)*(i/60) - Math.PI/2;
+      const isHour = (i%5===0);
+      const len = isHour ? r*0.14 : r*0.07;
+      const w = isHour ? Math.max(2, r*0.05) : Math.max(1, r*0.02);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(ang)*(r - len), Math.sin(ang)*(r - len));
+      ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r);
+      ctx.lineWidth = w;
+      ctx.strokeStyle = isHour ? "rgba(24,50,71,.55)" : "rgba(24,50,71,.25)";
+      ctx.stroke();
+    }
+
+    // numbers 12,3,6,9
+    ctx.fillStyle = "rgba(24,50,71,.85)";
+    ctx.font = `800 ${Math.max(14, r*0.22)}px ${getFontStack()}`;
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("12", 0, -r*0.63);
+    ctx.fillText("3",  r*0.63, 0);
+    ctx.fillText("6",  0,  r*0.63);
+    ctx.fillText("9", -r*0.63, 0);
+
+    // hands
+    const hour = hh % 12;
+    const hourAng = (Math.PI*2)*((hour + mm/60)/12) - Math.PI/2;
+    const minAng  = (Math.PI*2)*(mm/60) - Math.PI/2;
+
+    // hour hand
+    ctx.beginPath();
+    ctx.lineWidth = Math.max(3, r*0.08);
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(24,50,71,.92)";
+    ctx.moveTo(0,0);
+    ctx.lineTo(Math.cos(hourAng)*(r*0.52), Math.sin(hourAng)*(r*0.52));
+    ctx.stroke();
+
+    // minute hand
+    ctx.beginPath();
+    ctx.lineWidth = Math.max(2, r*0.05);
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(24,50,71,.82)";
+    ctx.moveTo(0,0);
+    ctx.lineTo(Math.cos(minAng)*(r*0.75), Math.sin(minAng)*(r*0.75));
+    ctx.stroke();
+
+    // center cap
+    ctx.beginPath();
+    ctx.arc(0,0, Math.max(3, r*0.06), 0, Math.PI*2);
+    ctx.fillStyle = "rgba(24,50,71,.9)";
+    ctx.fill();
+
+    // optional digital text
+    if(showDigital){
+      ctx.font = `700 ${Math.max(12, r*0.18)}px ${getFontStack()}`;
+      ctx.fillStyle = "rgba(24,50,71,.65)";
+      ctx.fillText(`${pad2(hh)}:${pad2(mm)}`, 0, r*0.88);
+    }
+
+    ctx.restore();
+  }
+
+  function getFontStack(){
+    // Prefer JP fonts for consistent look (Canvas uses available local fonts)
+    return `"Noto Sans JP","BIZ UDPGothic","Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",sans-serif`;
+  }
+
+  function renderClockSheet(canvas, choices){
+    // choices: [{label, time}, ... 4]
+    // draw 2x2 clocks in one image with labels
+    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const W = 1200, H = 900; // base logical pixels
+    canvas.width  = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = "100%";
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+    // background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,W,H);
+
+    // layout
+    const pad = 40;
+    const cellW = (W - pad*3) / 2;
+    const cellH = (H - pad*3) / 2;
+
+    // title row is not needed; we draw each label
+    ctx.font = `900 28px ${getFontStack()}`;
+    ctx.fillStyle = "rgba(24,50,71,.92)";
+    ctx.textBaseline = "top";
+
+    for(let i=0;i<4;i++){
+      const row = Math.floor(i/2);
+      const col = i%2;
+      const x0 = pad + col*(cellW + pad);
+      const y0 = pad + row*(cellH + pad);
+
+      // card bg
+      roundRect(ctx, x0, y0, cellW, cellH, 22);
+      ctx.fillStyle = "rgba(47,146,208,.06)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(24,50,71,.12)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // label
+      ctx.fillStyle = "rgba(24,50,71,.92)";
+      ctx.fillText(choices[i].label, x0 + 18, y0 + 16);
+
+      // clock
+      const cx = x0 + cellW/2;
+      const cy = y0 + cellH/2 + 16;
+      const r = Math.min(cellW, cellH)*0.34;
+      drawClock(ctx, cx, cy, r, choices[i].time, {showDigital:false});
+    }
+  }
+
+  function roundRect(ctx, x, y, w, h, r){
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+  }
+
+  // ========= Rendering =========
+  let lastParsed = null;
+  let lastQ3 = null;
+
+  function validateData(obj){
+    // Minimal validation with helpful messages
+    const errs = [];
+    if(!obj || typeof obj !== "object") errs.push("JSONがオブジェクトではありません。");
+
+    const needStr = (k) => {
+      if(!(k in obj)) errs.push(`"${k}" がありません。`);
+      else if(typeof obj[k] !== "string") errs.push(`"${k}" は文字列にしてください。`);
+    };
+    needStr("title");
+    needStr("situation");
+
+    if(!Array.isArray(obj.schedule)) errs.push(`"schedule" は配列にしてください。`);
+    else {
+      if(obj.schedule.length < 4 || obj.schedule.length > 6) errs.push(`"schedule" は4〜6行にしてください（今は ${obj.schedule.length} 行）。`);
+      obj.schedule.forEach((row, i)=>{
+        if(!row || typeof row !== "object") { errs.push(`schedule[${i}] がオブジェクトではありません。`); return; }
+        ["time","place","note"].forEach(k=>{
+          if(!(k in row)) errs.push(`schedule[${i}].${k} がありません。`);
+          else if(typeof row[k] !== "string") errs.push(`schedule[${i}].${k} は文字列にしてください。`);
+        });
+      });
+    }
+
+    if(!obj.questions || typeof obj.questions !== "object") errs.push(`"questions" がありません。`);
+    else {
+      ["q1","q2","q4"].forEach(k=>{
+        if(typeof obj.questions[k] !== "string") errs.push(`questions.${k} は文字列にしてください。`);
+      });
+      if(typeof obj.questions.q3_target_time !== "string") errs.push(`questions.q3_target_time は "HH:MM" の文字列にしてください。`);
+      else {
+        const t = parseHHMM(obj.questions.q3_target_time);
+        if(!t) errs.push(`questions.q3_target_time の形式が不正です（例 "14:35"）。`);
+      }
+      if(!Array.isArray(obj.questions.choices_q4) || obj.questions.choices_q4.length !== 3){
+        errs.push(`questions.choices_q4 は3つの配列にしてください。`);
+      }
+    }
+
+    if(!obj.answers || typeof obj.answers !== "object") errs.push(`"answers" がありません。`);
+    else {
+      ["q1","q2","q3","q4"].forEach(k=>{
+        if(typeof obj.answers[k] !== "string") errs.push(`answers.${k} は文字列にしてください。`);
+      });
+    }
+
+    return errs;
+  }
+
+  function renderAll(obj){
+    const out = $("output");
+    out.innerHTML = "";
+
+    const title = document.createElement("h1");
+    title.className = "outTitle";
+    title.textContent = safeText(obj.title);
+
+    const sit = document.createElement("p");
+    sit.className = "outSituation";
+    sit.textContent = safeText(obj.situation);
+
+    out.appendChild(title);
+    out.appendChild(sit);
+
+    // Schedule table
+    const tbl = document.createElement("table");
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+      <tr>
+        <th style="width:110px">時刻</th>
+        <th>行く場所・すること</th>
+        <th style="width:260px">交通手段や注意点</th>
+      </tr>`;
+    tbl.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    obj.schedule.forEach(row=>{
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td"); td1.textContent = safeText(row.time);
+      const td2 = document.createElement("td"); td2.textContent = safeText(row.place);
+      const td3 = document.createElement("td"); td3.textContent = safeText(row.note);
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    out.appendChild(tbl);
+
+    // Q1
+    out.appendChild(makeQBlock("問1：情報の抽出", obj.questions.q1));
+
+    // Q2
+    out.appendChild(makeQBlock("問2：時間の計算", obj.questions.q2));
+
+    // Q3 with clocks
+    const target = parseHHMM(obj.questions.q3_target_time);
+    lastQ3 = generateQ3Choices(target);
+
+    const q3Block = document.createElement("div");
+    q3Block.className = "qblock";
+
+    const q3Head = document.createElement("div");
+    q3Head.className = "qhead";
+    q3Head.textContent = "問3：時計の読み（ア〜エから選ぶ）";
+    q3Block.appendChild(q3Head);
+
+    const q3Body = document.createElement("div");
+    q3Body.className = "qbody";
+    const p = document.createElement("p");
+    p.className = "qtext";
+    p.textContent = `次の活動の時刻は「${pad2(target.hh)}:${pad2(target.mm)}」です。これを示すアナログ時計はどれですか。`;
+    q3Body.appendChild(p);
+
+    const canvasWrap = document.createElement("div");
+    canvasWrap.className = "canvasWrap";
+    const canvasTop = document.createElement("div");
+    canvasTop.className = "canvasTop";
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML = `・正解の時刻：<b>${pad2(target.hh)}:${pad2(target.mm)}</b>（※表示はアナログのみ）<br>・ア〜エは毎回シャッフルされます`;
+    const btnRow = document.createElement("div");
+    btnRow.className = "row no-print";
+    const btnRe = document.createElement("button");
+    btnRe.className = "btn secondary";
+    btnRe.textContent = "時計だけ作り直す";
+    btnRe.addEventListener("click", ()=>{
+      lastQ3 = generateQ3Choices(target);
+      renderClockSheet(canvas, lastQ3.choices);
+      // also update answer block if present
+      const ansQ3 = document.getElementById("ansQ3");
+      if(ansQ3) ansQ3.textContent = lastQ3.correctLabel;
+    });
+    btnRow.appendChild(btnRe);
+
+    canvasTop.appendChild(meta);
+    canvasTop.appendChild(btnRow);
+
+    const canvas = document.createElement("canvas");
+    canvas.id = "clockCanvas";
+    canvasWrap.appendChild(canvasTop);
+    canvasWrap.appendChild(canvas);
+
+    q3Body.appendChild(canvasWrap);
+
+    // choices list (text)
+    const choiceList = document.createElement("div");
+    choiceList.className = "choices";
+    lastQ3.choices.forEach(ch=>{
+      const div = document.createElement("div");
+      div.className = "choice";
+      div.textContent = `${ch.label}`;
+      choiceList.appendChild(div);
+    });
+    q3Body.appendChild(choiceList);
+
+    q3Block.appendChild(q3Body);
+    out.appendChild(q3Block);
+
+    // draw clocks
+    renderClockSheet(canvas, lastQ3.choices);
+
+    // Q4 (3-choice)
+    const q4 = document.createElement("div");
+    q4.className = "qblock";
+    q4.innerHTML = `<div class="qhead">問4：マナー・知識（3択）</div>`;
+    const q4Body = document.createElement("div");
+    q4Body.className = "qbody";
+    const q4p = document.createElement("p");
+    q4p.className = "qtext";
+    q4p.textContent = safeText(obj.questions.q4);
+    q4Body.appendChild(q4p);
+
+    const q4Choices = document.createElement("div");
+    q4Choices.className = "choices";
+    const labels3 = ["①","②","③"];
+    (obj.questions.choices_q4 || []).forEach((c, i)=>{
+      const div = document.createElement("div");
+      div.className = "choice";
+      div.textContent = `${labels3[i] || ""} ${safeText(c)}`;
+      q4Choices.appendChild(div);
+    });
+    q4Body.appendChild(q4Choices);
+    q4.appendChild(q4Body);
+    out.appendChild(q4);
+
+    // Answers
+    const ans = document.createElement("div");
+    ans.className = "answers";
+    ans.innerHTML = `
+      <h3>解答・ポイント</h3>
+      <p>【問1】${escapeHtml(obj.answers.q1)}<br>
+         【問2】${escapeHtml(obj.answers.q2)}<br>
+         【問3】<span id="ansQ3">${escapeHtml(lastQ3.correctLabel)}</span><br>
+         【問4】${escapeHtml(obj.answers.q4)}
+      </p>
+    `;
+    out.appendChild(ans);
+  }
+
+  function makeQBlock(head, text){
+    const box = document.createElement("div");
+    box.className = "qblock";
+    const h = document.createElement("div");
+    h.className = "qhead";
+    h.textContent = head;
+    const b = document.createElement("div");
+    b.className = "qbody";
+    const p = document.createElement("p");
+    p.className = "qtext";
+    p.textContent = safeText(text);
+    b.appendChild(p);
+    box.appendChild(h);
+    box.appendChild(b);
+    return box;
+  }
+
+  function escapeHtml(s){
+    return safeText(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  // ========= Buttons =========
+  $("btnSample").addEventListener("click", ()=>{
+    clearError();
+    $("jsonInput").value = JSON.stringify(sampleData(), null, 2);
+  });
+
+  $("btnRender").addEventListener("click", ()=>{
+    clearError();
+    try{
+      const obj = JSON.parse($("jsonInput").value || "null");
+      const errs = validateData(obj);
+      if(errs.length){
+        showError("入力JSONに問題があります：\n- " + errs.join("\n- "));
+        return;
+      }
+      lastParsed = obj;
+      renderAll(obj);
+    }catch(e){
+      showError("JSONの読み取りに失敗しました。\n" + (e && e.message ? e.message : String(e)));
+    }
+  });
+
+  $("btnShuffle").addEventListener("click", ()=>{
+    clearError();
+    if(!lastParsed){
+      showError("先に「表示する」を押して、問題を表示してください。");
+      return;
+    }
+    const t = parseHHMM(lastParsed.questions.q3_target_time);
+    lastQ3 = generateQ3Choices(t);
+    const canvas = document.getElementById("clockCanvas");
+    if(canvas) renderClockSheet(canvas, lastQ3.choices);
+    const ansQ3 = document.getElementById("ansQ3");
+    if(ansQ3) ansQ3.textContent = lastQ3.correctLabel;
+  });
+
+  $("btnPrint").addEventListener("click", ()=> window.print());
+
+  $("btnClear").addEventListener("click", ()=>{
+    clearError();
+    lastParsed = null;
+    lastQ3 = null;
+    $("jsonInput").value = "";
+    $("output").innerHTML = `<p style="margin:0;color:var(--muted);line-height:1.7">
+      右上の「サンプルJSONを入れる」→「表示する」で、動作が確認できます。<br>
+      GPTsのJSONを貼ったら「表示する」を押してください。
+    </p>`;
+  });
+
+  // ========= Sample =========
+  function sampleData(){
+    return {
+      "title": "職場体験の日の予定",
+      "situation": "あなたは職場体験で、地域の図書館に行きます。表を見て、必要な情報を読み取って答えましょう。",
+      "schedule": [
+        {"time":"08:30","place":"学校に集合する","note":"※えんぴつとメモ帳を持つ"},
+        {"time":"08:45","place":"『バス』で図書館へ向かう","note":"『市バス』に乗る。お金は出さない"},
+        {"time":"09:10","place":"図書館であいさつと説明を聞く","note":"静かに聞く"},
+        {"time":"09:30","place":"本の整理をする","note":"走らない"},
+        {"time":"10:20","place":"休けいをする","note":"水分をとる"},
+        {"time":"10:40","place":"返却カウンターの見学をする","note":"※名ふだをつける"}
+      ],
+      "questions": {
+        "q1":"表の中で、持ち物として書かれているものを2つ答えなさい。",
+        "q2":"図書館へ向かう『バス』に乗る時刻は08:45です。図書館であいさつと説明を聞く時刻は09:10です。何分かかりますか。",
+        "q3_target_time":"10:40",
+        "q4":"図書館で本を整理するときに、ふさわしい行動はどれですか。",
+        "choices_q4":[
+          "大きな声で友だちと話す",
+          "静かに動いて、本をていねいにあつかう",
+          "走って早く片づける"
+        ]
+      },
+      "answers": {
+        "q1":"えんぴつ、メモ帳（※の行に書いてある）",
+        "q2":"25分（08:45→09:10）",
+        "q3":"（自動判定）",
+        "q4":"②（静かに動いて、本をていねいにあつかう）"
+      }
+    };
+  }
+
+  // 初期はサンプルを入れておく（邪魔なら消してOK）
+  $("jsonInput").value = JSON.stringify(sampleData(), null, 2);
+</script>
+</body>
+</html>
+```
