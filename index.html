@@ -1,901 +1,575 @@
-```html
 <!doctype html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>時計つき読解問題ジェネレーター（JSON→表示＋時計描画）</title>
+  <title>読解問題ビューア（JSON貼り付け）</title>
   <style>
     :root{
-      --bg:#f6fbff;
+      --bg:#f4fbff;
       --card:#ffffff;
-      --text:#183247;
-      --muted:#5c7488;
-      --accent:#2f92d0;
-      --ok:#1f9d5a;
-      --warn:#d85b49;
-      --border:rgba(24,50,71,.12);
-      --shadow:0 10px 24px rgba(24,50,71,.12);
+      --text:#16384b;
+      --muted:#5b7787;
+      --accent:#2aa0df;
+      --ok:#1f9d66;
+      --warn:#e46a5c;
+      --shadow:0 10px 24px rgba(0,0,0,.10);
       --radius:18px;
-      --pad:14px;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      --jp: "Noto Sans JP","BIZ UDPGothic","Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
     }
-    *{box-sizing:border-box}
+    *{ box-sizing:border-box; }
     body{
       margin:0;
-      font-family:var(--jp);
+      font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+      background: linear-gradient(180deg, #eef9ff 0%, #f7fff7 100%);
       color:var(--text);
-      background:linear-gradient(180deg,#eff8ff 0%, #f8fff6 100%);
       min-height:100dvh;
     }
     header{
-      position:sticky; top:0; z-index:10;
-      background:rgba(246,251,255,.92);
-      backdrop-filter: blur(10px);
-      border-bottom:1px solid var(--border);
+      position:sticky; top:0; z-index:5;
+      background: rgba(244,251,255,.86);
+      backdrop-filter: blur(8px);
+      border-bottom:1px solid rgba(0,0,0,.06);
     }
-    .wrap{width:min(1100px,100%); margin:0 auto; padding:14px;}
-    .topbar{
-      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
-    }
-    .title{
-      font-weight:800;
-      letter-spacing:.02em;
-      font-size:18px;
-      display:flex; align-items:center; gap:10px;
-    }
-    .pill{
-      font-size:12px; color:var(--muted);
-      border:1px solid var(--border);
-      padding:4px 10px; border-radius:999px;
-      background:#fff;
-    }
-    .grid{
-      display:grid;
-      grid-template-columns: 1fr 1.2fr;
-      gap:14px;
-      align-items:start;
-      padding-bottom:20px;
-    }
-    @media (max-width: 980px){
-      .grid{grid-template-columns:1fr; }
-    }
-    .card{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      overflow:hidden;
-    }
-    .card h2{
-      margin:0;
-      padding:12px 14px;
-      font-size:14px;
-      color:var(--muted);
-      border-bottom:1px solid var(--border);
-      background:linear-gradient(180deg,#ffffff 0%, #fbfdff 100%);
-    }
-    .card .content{padding:14px;}
-    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .wrap{ width:min(980px, 100%); margin:0 auto; padding:14px 14px 22px; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .btn{
       appearance:none; border:none; cursor:pointer;
-      background:var(--accent); color:#fff;
-      padding:10px 12px; border-radius:12px;
-      font-weight:800; letter-spacing:.02em;
-      box-shadow:0 8px 18px rgba(47,146,208,.24);
+      padding:12px 14px; border-radius:14px;
+      background:var(--accent); color:white; font-weight:800;
+      box-shadow: 0 10px 18px rgba(42,160,223,.22);
+      display:inline-flex; align-items:center; gap:10px;
+      user-select:none;
     }
-    .btn:active{transform:translateY(1px)}
+    .btn:active{ transform: translateY(1px); }
     .btn.secondary{
-      background:#fff; color:var(--text);
-      border:1px solid var(--border);
-      box-shadow:none;
+      background:#ffffff; color:var(--text);
+      border:1px solid rgba(0,0,0,.10);
+      box-shadow: none;
     }
-    .btn.danger{
-      background:var(--warn);
-      box-shadow:0 8px 18px rgba(216,91,73,.22);
+    .btn.ok{ background:var(--ok); }
+    .btn.warn{ background:var(--warn); }
+
+    .card{
+      background:var(--card);
+      border:1px solid rgba(0,0,0,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      margin-top: 12px;
     }
-    .btn.ok{
-      background:var(--ok);
-      box-shadow:0 8px 18px rgba(31,157,90,.20);
+    .title{
+      font-size: 22px;
+      font-weight: 900;
+      margin: 0 0 6px;
+      letter-spacing: .02em;
     }
-    textarea{
-      width:100%;
-      min-height:280px;
-      resize:vertical;
-      font-family:var(--mono);
-      font-size:12.5px;
-      line-height:1.45;
-      padding:12px;
-      border-radius:14px;
-      border:1px solid var(--border);
-      outline:none;
-      background:#fbfdff;
-      color:#0f2a3d;
-    }
-    .hint{
-      margin-top:10px;
+    .scenario{
+      margin: 0;
       color:var(--muted);
-      font-size:12.5px;
-      line-height:1.5;
-    }
-    .error{
-      margin-top:10px;
-      color:#9c2f25;
-      background:rgba(216,91,73,.12);
-      border:1px solid rgba(216,91,73,.25);
-      padding:10px 12px;
-      border-radius:12px;
-      display:none;
-      white-space:pre-wrap;
-      word-break:break-word;
+      line-height:1.55;
+      font-weight:600;
     }
 
-    /* output */
-    .outTitle{
-      font-size:20px;
-      font-weight:900;
-      margin:0 0 6px 0;
-      letter-spacing:.02em;
+    textarea{
+      width:100%;
+      min-height: 180px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono", monospace;
+      font-size: 13px;
+      line-height: 1.45;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.14);
+      outline: none;
+      background: #fbfdff;
+      color: #0b2a3a;
     }
-    .outSituation{
-      margin:0 0 14px 0;
+    .hint{
+      margin: 8px 0 0;
       color:var(--muted);
-      line-height:1.6;
-      font-size:14px;
+      font-size: 13px;
+      line-height:1.45;
+      font-weight:600;
     }
+
     table{
       width:100%;
-      border-collapse:separate;
-      border-spacing:0;
+      border-collapse: separate;
+      border-spacing: 0;
       overflow:hidden;
-      border-radius:14px;
-      border:1px solid var(--border);
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.10);
       background:#fff;
     }
     th, td{
-      padding:10px 10px;
-      border-bottom:1px solid var(--border);
-      vertical-align:top;
-      font-size:14px;
-      line-height:1.5;
+      padding: 10px 10px;
+      border-bottom: 1px solid rgba(0,0,0,.08);
+      vertical-align: top;
+      font-size: 15px;
     }
     th{
-      background:#f2f8ff;
-      color:#21405a;
-      font-weight:800;
-      white-space:nowrap;
+      text-align:left;
+      background: #f2f8ff;
+      font-weight: 900;
     }
-    tr:last-child td{border-bottom:none;}
-    .qblock{
-      margin-top:14px;
-      border:1px solid var(--border);
-      border-radius:14px;
-      overflow:hidden;
-      background:#fff;
+    tr:last-child td{ border-bottom:none; }
+    .col-time{ width: 90px; white-space: nowrap; font-weight: 900; }
+
+    .qblock{ margin-top: 12px; }
+    .qtitle{
+      font-weight: 900;
+      margin: 0 0 6px;
+      font-size: 16px;
     }
-    .qhead{
-      padding:10px 12px;
-      background:#fbfdff;
-      border-bottom:1px solid var(--border);
-      font-weight:900;
+    .qtext{
+      margin: 0 0 8px;
+      line-height: 1.55;
+      font-weight: 650;
     }
-    .qbody{padding:12px;}
-    .qtext{margin:0; line-height:1.7; font-size:15px;}
     .choices{
-      margin-top:10px;
       display:grid;
-      grid-template-columns:1fr;
-      gap:8px;
+      grid-template-columns: repeat(1, 1fr);
+      gap: 8px;
     }
     .choice{
-      border:1px dashed var(--border);
-      border-radius:12px;
-      padding:10px 12px;
+      border: 1px solid rgba(0,0,0,.10);
       background:#fff;
+      border-radius: 14px;
+      padding: 10px;
+      display:flex;
+      gap: 10px;
+      align-items:flex-start;
+    }
+    .badge{
+      width: 34px; height: 34px;
+      border-radius: 12px;
+      display:grid; place-items:center;
+      background:#e9f6ff;
+      color:#0b4c6d;
+      font-weight: 1000;
+      flex: 0 0 auto;
+      border: 1px solid rgba(0,0,0,.08);
+    }
+    .choice-main{ flex:1; }
+    .choice-line{
+      margin:0;
+      font-weight: 750;
+      line-height:1.45;
+    }
+    .clockbox{
+      margin-top: 8px;
+      border-radius: 14px;
+      border: 1px dashed rgba(0,0,0,.22);
+      padding: 10px;
+      background: #fbfdff;
+    }
+    .clockbox .small{ color:var(--muted); font-size: 12px; font-weight:700; margin: 6px 0 0; }
+    .clock-row{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .clock-choice{
+      border: 1px solid rgba(0,0,0,.10);
+      border-radius: 14px;
+      padding: 10px;
+      background:#fff;
+      display:flex;
+      gap: 10px;
+      align-items:center;
+    }
+    .clock-label{
+      width: 34px; height: 34px;
+      border-radius: 12px;
+      display:grid; place-items:center;
+      background:#e9f6ff;
+      color:#0b4c6d;
+      font-weight: 1000;
+      border: 1px solid rgba(0,0,0,.08);
+      flex:0 0 auto;
+    }
+    .clock-time{
+      font-weight: 950;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+    .imgph{
+      margin-left:auto;
+      width: 112px;
+      height: 72px;
+      border-radius: 12px;
+      background: repeating-linear-gradient(
+        45deg,
+        #f4f7fb,
+        #f4f7fb 10px,
+        #eef3f8 10px,
+        #eef3f8 20px
+      );
+      border: 1px solid rgba(0,0,0,.10);
+      display:grid;
+      place-items:center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px;
+      text-align:center;
     }
 
-    .canvasWrap{
-      margin-top:12px;
-      border:1px solid var(--border);
-      border-radius:14px;
-      overflow:hidden;
+    details{
+      margin-top: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.10);
       background:#fff;
+      padding: 10px 12px;
     }
-    .canvasTop{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:10px; flex-wrap:wrap;
-      padding:10px 12px;
-      border-bottom:1px solid var(--border);
-      background:#fbfdff;
+    summary{
+      cursor:pointer;
+      font-weight: 950;
+      color:#0b4c6d;
     }
-    .canvasTop .meta{
-      color:var(--muted);
-      font-size:12.5px;
-      line-height:1.5;
+    .ans{
+      margin: 10px 0 0;
+      padding: 10px;
+      border-radius: 14px;
+      background: #f2fff7;
+      border: 1px solid rgba(31,157,102,.25);
     }
-    canvas{
-      width:100%;
-      height:auto;
-      display:block;
-      background:#fff;
+    .ans p{ margin: 6px 0; font-weight: 700; line-height: 1.55; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono", monospace; }
+    .err{
+      color:#7b1f14;
+      background:#fff3f1;
+      border:1px solid rgba(228,106,92,.30);
+      border-radius: 14px;
+      padding: 10px;
+      font-weight: 800;
+      line-height:1.45;
+      margin-top: 10px;
+      white-space: pre-wrap;
     }
-    .answers{
-      margin-top:14px;
-      border:1px solid rgba(31,157,90,.25);
-      background:rgba(31,157,90,.08);
-      border-radius:14px;
-      padding:12px;
-    }
-    .answers h3{
-      margin:0 0 8px 0;
-      font-size:14px;
-      font-weight:900;
-      color:#0f5b35;
-    }
-    .answers p{margin:0; line-height:1.7; font-size:14px;}
 
-    /* Print */
+    @media (min-width: 720px){
+      .choices{ grid-template-columns: repeat(2, 1fr); }
+    }
+
     @media print{
-      header, .no-print{display:none !important;}
-      body{background:#fff;}
-      .wrap{width:100%; padding:0;}
-      .grid{grid-template-columns:1fr; gap:0;}
-      .card{
-        box-shadow:none;
-        border:none;
-        border-radius:0;
-      }
-      .card h2{display:none;}
-      .card .content{padding:0;}
-      .qblock, table, .canvasWrap, .answers{
-        box-shadow:none;
-        page-break-inside:avoid;
-      }
-      @page{
-        size: A4;
-        margin: 12mm;
-      }
+      header{ position: static; border:none; background:transparent; }
+      body{ background:#fff; }
+      .btn, .hint, textarea, .card#inputCard { display:none !important; }
+      .card{ box-shadow:none; }
+      .imgph{ border:1px solid #aaa; }
+      details{ border:1px solid #aaa; }
     }
   </style>
 </head>
 <body>
-<header class="no-print">
+<header>
   <div class="wrap">
-    <div class="topbar">
-      <div class="title">
-        時計つき読解問題ジェネレーター
-        <span class="pill">JSON貼り付け → 表示 → 時計4択を自動描画</span>
-      </div>
-      <div class="row">
-        <button class="btn secondary" id="btnSample">サンプルJSONを入れる</button>
-        <button class="btn ok" id="btnRender">表示する</button>
-        <button class="btn" id="btnShuffle">問3の選択肢を作り直す</button>
-        <button class="btn secondary" id="btnPrint">印刷</button>
-        <button class="btn danger" id="btnClear">消す</button>
-      </div>
+    <div class="row">
+      <button class="btn" id="openGptsBtn" type="button">GPTsを開く（問題生成）</button>
+      <button class="btn secondary" id="loadSampleBtn" type="button">サンプルを入れる</button>
+      <button class="btn ok" id="renderBtn" type="button">JSONを表示</button>
+      <button class="btn warn" id="clearBtn" type="button">クリア</button>
     </div>
+    <p class="hint">
+      使い方：①「GPTsを開く」→生成されたJSONをコピー ②下の欄に貼る ③「JSONを表示」<br>
+      ※問3の時計画像は、あなたが用意した画像をこのHTMLに組み込む想定（今はプレースホルダ表示）。
+    </p>
   </div>
 </header>
 
 <main class="wrap">
-  <div class="grid">
-    <!-- LEFT -->
-    <section class="card no-print">
-      <h2>① JSON入力</h2>
-      <div class="content">
-        <textarea id="jsonInput" spellcheck="false"></textarea>
-        <div class="hint">
-          ・GPTsで「JSONのみ出力」させた結果をここに貼ります。<br>
-          ・問3は <b>"q3_target_time": "HH:MM"</b> を必ず入れてください（例 "14:35"）。<br>
-          ・このツールが、正解＋ひっかけ3つを自動生成して、時計画像（ア〜エ）を1枚に描きます。
-        </div>
-        <div class="error" id="errBox"></div>
-      </div>
-    </section>
+  <section class="card" id="inputCard">
+    <h2 class="title" style="margin-bottom:10px;">JSON貼り付け</h2>
+    <textarea id="jsonInput" placeholder='{"version":"1.0", ... }'></textarea>
+    <div id="errorBox" class="err" style="display:none;"></div>
+  </section>
 
-    <!-- RIGHT -->
-    <section class="card">
-      <h2>② 出力（問題＋時計）</h2>
-      <div class="content" id="output">
-        <p style="margin:0;color:var(--muted);line-height:1.7">
-          右上の「サンプルJSONを入れる」→「表示する」で、動作が確認できます。<br>
-          GPTsのJSONを貼ったら「表示する」を押してください。
-        </p>
-      </div>
-    </section>
-  </div>
+  <section class="card" id="outputCard" style="display:none;">
+    <h1 class="title" id="outTitle"></h1>
+    <p class="scenario" id="outScenario"></p>
+
+    <div class="qblock">
+      <h3 class="qtitle">スケジュール</h3>
+      <div id="outTable"></div>
+    </div>
+
+    <div class="qblock" id="q1"></div>
+    <div class="qblock" id="q2"></div>
+    <div class="qblock" id="q3"></div>
+    <div class="qblock" id="q4"></div>
+
+    <details id="answerPanel">
+      <summary>解答・解説（クリックで開く）</summary>
+      <div class="ans" id="answers"></div>
+    </details>
+  </section>
 </main>
 
 <script>
-  // ========= Utilities =========
+(() => {
+  "use strict";
+
+  // ★ あなたのGPTsリンク（受け取り済み）
+  const GPTS_URL = "https://chatgpt.com/g/g-6993202af6e48191b0317dc51e832337-da-wen-7";
+
   const $ = (id) => document.getElementById(id);
 
-  function safeText(s){
-    if (s === null || s === undefined) return "";
-    return String(s);
-  }
+  const jsonInput = $("jsonInput");
+  const errorBox = $("errorBox");
+  const outputCard = $("outputCard");
 
-  function pad2(n){ return String(n).padStart(2,"0"); }
+  $("openGptsBtn").addEventListener("click", () => {
+    window.open(GPTS_URL, "_blank", "noopener,noreferrer");
+  });
 
-  function parseHHMM(hhmm){
-    const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || "").trim());
-    if(!m) return null;
-    const hh = Number(m[1]);
-    const mm = Number(m[2]);
-    if(!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-    if(hh<0 || hh>23 || mm<0 || mm>59) return null;
-    return {hh, mm};
-  }
+  $("clearBtn").addEventListener("click", () => {
+    jsonInput.value = "";
+    hideError();
+    outputCard.style.display = "none";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
 
-  function toMinutes(t){ return t.hh*60 + t.mm; }
+  $("loadSampleBtn").addEventListener("click", () => {
+    jsonInput.value = JSON.stringify(sampleData(), null, 2);
+    hideError();
+  });
 
-  function fromMinutes(min){
-    let m = ((min % (24*60)) + 24*60) % (24*60);
-    const hh = Math.floor(m/60);
-    const mm = m%60;
-    return {hh, mm};
-  }
+  $("renderBtn").addEventListener("click", () => {
+    hideError();
+    const raw = jsonInput.value.trim();
+    if (!raw) return showError("JSONが空です。GPTsの出力（{ から } まで）を貼り付けてください。");
 
-  function fmtHHMM(t){ return `${pad2(t.hh)}:${pad2(t.mm)}`; }
-
-  function shuffle(arr){
-    const a = arr.slice();
-    for(let i=a.length-1;i>0;i--){
-      const j = Math.floor(Math.random()*(i+1));
-      [a[i],a[j]] = [a[j],a[i]];
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      return showError("JSONの解析に失敗しました。\n\n" + String(e));
     }
-    return a;
-  }
 
-  function uniqueTimes(times){
-    const seen = new Set();
-    const out = [];
-    for(const t of times){
-      const key = fmtHHMM(t);
-      if(!seen.has(key)){
-        seen.add(key);
-        out.push(t);
-      }
-    }
-    return out;
-  }
+    const err = validate(data);
+    if (err) return showError(err);
+
+    render(data);
+    outputCard.style.display = "block";
+    // 出力へスクロール
+    outputCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 
   function showError(msg){
-    const box = $("errBox");
-    box.style.display = "block";
-    box.textContent = msg;
+    errorBox.style.display = "block";
+    errorBox.textContent = msg;
   }
-  function clearError(){
-    const box = $("errBox");
-    box.style.display = "none";
-    box.textContent = "";
+  function hideError(){
+    errorBox.style.display = "none";
+    errorBox.textContent = "";
   }
 
-  // ========= Q3 Choice Generation =========
-  // Make 1 correct + 3 plausible wrong times.
-  function generateQ3Choices(target){
-    // Target is {hh,mm}
-    // Wrong ideas:
-    // 1) swap hands-ish: interpret mm as hour-ish and hh as minute-ish (approx)
-    // 2) +1 hour
-    // 3) minute off by 5 or 10 (nearest tricky)
-    const baseMin = toMinutes(target);
-
-    // 1) "hands swapped" heuristic:
-    // - Treat minutes as hour position: hour' = floor(mm/5) (0-11)
-    // - Treat hour as minutes: minute' = (hh%12)*5 (0-55)
-    // Keep same AM/PM as base (roughly), by mapping to closest 24h time:
-    const swappedHour12 = Math.floor(target.mm / 5) % 12; // 0..11
-    const swappedMin = ((target.hh % 12) * 5) % 60;      // 0..55
-    // Choose swapped hour in 24h close to target.hh
-    // If target.hh is 12..23, prefer 12+swappedHour12 unless too far.
-    let swappedHh = swappedHour12;
-    if(target.hh >= 12) swappedHh = (swappedHour12 === 0 ? 12 : 12 + swappedHour12);
-    // If that equals 24, wrap:
-    swappedHh = swappedHh % 24;
-    const swapped = {hh: swappedHh, mm: swappedMin};
-
-    // 2) +1 hour
-    const plus1h = fromMinutes(baseMin + 60);
-
-    // 3) minute shift: +10 (if mm not near end) else -10
-    let minuteShift = 10;
-    if(target.mm >= 50) minuteShift = -10;
-    const minShift = fromMinutes(baseMin + minuteShift);
-
-    // 4) another wrong: -1 hour or +30 minutes depending on duplication
-    const altWrong = fromMinutes(baseMin - 60);
-
-    // Collect, ensure 4 unique; if duplicates occur, adjust with fallback offsets.
-    let candidates = uniqueTimes([target, swapped, plus1h, minShift, altWrong]);
-
-    // Ensure at least 4
-    const fallbackOffsets = [5, -5, 15, -15, 30, -30, 120, -120];
-    let k = 0;
-    while(candidates.length < 4 && k < fallbackOffsets.length){
-      candidates = uniqueTimes(candidates.concat([fromMinutes(baseMin + fallbackOffsets[k])]));
-      k++;
+  // ========== バリデーション ==========
+  function validate(d){
+    // 最低限の必須キー
+    const needRoot = ["version","seedHint","title","scenario","table","questions","explanations"];
+    for (const k of needRoot){
+      if (!(k in d)) return `必須キーがありません: ${k}`;
     }
-    // Take first 4 with target included
-    // Guarantee target is included:
-    const hasTarget = candidates.some(t => fmtHHMM(t) === fmtHHMM(target));
-    if(!hasTarget) candidates.unshift(target);
-    candidates = uniqueTimes(candidates);
-
-    // Make exact 4: keep target + first 3 others
-    const others = candidates.filter(t => fmtHHMM(t) !== fmtHHMM(target));
-    const four = [target].concat(others.slice(0,3));
-
-    // Shuffle for A-D
-    const labels = ["ア","イ","ウ","エ"];
-    const shuffled = shuffle(four).map((t, idx) => ({ label: labels[idx], time: t }));
-    const correctLabel = shuffled.find(x => fmtHHMM(x.time) === fmtHHMM(target)).label;
-
-    return { choices: shuffled, correctLabel };
-  }
-
-  // ========= Clock Drawing =========
-  function drawClock(ctx, cx, cy, r, time, opts={}){
-    const hh = time.hh;
-    const mm = time.mm;
-    const showDigital = !!opts.showDigital;
-
-    // face
-    ctx.save();
-    ctx.translate(cx, cy);
-
-    // outer circle
-    ctx.beginPath();
-    ctx.arc(0,0,r,0,Math.PI*2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.lineWidth = Math.max(2, r*0.05);
-    ctx.strokeStyle = "rgba(24,50,71,.35)";
-    ctx.stroke();
-
-    // ticks
-    for(let i=0;i<60;i++){
-      const ang = (Math.PI*2)*(i/60) - Math.PI/2;
-      const isHour = (i%5===0);
-      const len = isHour ? r*0.14 : r*0.07;
-      const w = isHour ? Math.max(2, r*0.05) : Math.max(1, r*0.02);
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(ang)*(r - len), Math.sin(ang)*(r - len));
-      ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r);
-      ctx.lineWidth = w;
-      ctx.strokeStyle = isHour ? "rgba(24,50,71,.55)" : "rgba(24,50,71,.25)";
-      ctx.stroke();
+    if (!Array.isArray(d.table) || d.table.length < 4 || d.table.length > 6){
+      return "table は 4〜6行の配列である必要があります。";
     }
-
-    // numbers 12,3,6,9
-    ctx.fillStyle = "rgba(24,50,71,.85)";
-    ctx.font = `800 ${Math.max(14, r*0.22)}px ${getFontStack()}`;
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText("12", 0, -r*0.63);
-    ctx.fillText("3",  r*0.63, 0);
-    ctx.fillText("6",  0,  r*0.63);
-    ctx.fillText("9", -r*0.63, 0);
-
-    // hands
-    const hour = hh % 12;
-    const hourAng = (Math.PI*2)*((hour + mm/60)/12) - Math.PI/2;
-    const minAng  = (Math.PI*2)*(mm/60) - Math.PI/2;
-
-    // hour hand
-    ctx.beginPath();
-    ctx.lineWidth = Math.max(3, r*0.08);
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "rgba(24,50,71,.92)";
-    ctx.moveTo(0,0);
-    ctx.lineTo(Math.cos(hourAng)*(r*0.52), Math.sin(hourAng)*(r*0.52));
-    ctx.stroke();
-
-    // minute hand
-    ctx.beginPath();
-    ctx.lineWidth = Math.max(2, r*0.05);
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "rgba(24,50,71,.82)";
-    ctx.moveTo(0,0);
-    ctx.lineTo(Math.cos(minAng)*(r*0.75), Math.sin(minAng)*(r*0.75));
-    ctx.stroke();
-
-    // center cap
-    ctx.beginPath();
-    ctx.arc(0,0, Math.max(3, r*0.06), 0, Math.PI*2);
-    ctx.fillStyle = "rgba(24,50,71,.9)";
-    ctx.fill();
-
-    // optional digital text
-    if(showDigital){
-      ctx.font = `700 ${Math.max(12, r*0.18)}px ${getFontStack()}`;
-      ctx.fillStyle = "rgba(24,50,71,.65)";
-      ctx.fillText(`${pad2(hh)}:${pad2(mm)}`, 0, r*0.88);
-    }
-
-    ctx.restore();
-  }
-
-  function getFontStack(){
-    // Prefer JP fonts for consistent look (Canvas uses available local fonts)
-    return `"Noto Sans JP","BIZ UDPGothic","Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",sans-serif`;
-  }
-
-  function renderClockSheet(canvas, choices){
-    // choices: [{label, time}, ... 4]
-    // draw 2x2 clocks in one image with labels
-    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-    const W = 1200, H = 900; // base logical pixels
-    canvas.width  = Math.floor(W * dpr);
-    canvas.height = Math.floor(H * dpr);
-    canvas.style.width = "100%";
-    const ctx = canvas.getContext("2d");
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-
-    // background
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0,0,W,H);
-
-    // layout
-    const pad = 40;
-    const cellW = (W - pad*3) / 2;
-    const cellH = (H - pad*3) / 2;
-
-    // title row is not needed; we draw each label
-    ctx.font = `900 28px ${getFontStack()}`;
-    ctx.fillStyle = "rgba(24,50,71,.92)";
-    ctx.textBaseline = "top";
-
-    for(let i=0;i<4;i++){
-      const row = Math.floor(i/2);
-      const col = i%2;
-      const x0 = pad + col*(cellW + pad);
-      const y0 = pad + row*(cellH + pad);
-
-      // card bg
-      roundRect(ctx, x0, y0, cellW, cellH, 22);
-      ctx.fillStyle = "rgba(47,146,208,.06)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(24,50,71,.12)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // label
-      ctx.fillStyle = "rgba(24,50,71,.92)";
-      ctx.fillText(choices[i].label, x0 + 18, y0 + 16);
-
-      // clock
-      const cx = x0 + cellW/2;
-      const cy = y0 + cellH/2 + 16;
-      const r = Math.min(cellW, cellH)*0.34;
-      drawClock(ctx, cx, cy, r, choices[i].time, {showDigital:false});
-    }
-  }
-
-  function roundRect(ctx, x, y, w, h, r){
-    const rr = Math.min(r, w/2, h/2);
-    ctx.beginPath();
-    ctx.moveTo(x+rr, y);
-    ctx.arcTo(x+w, y, x+w, y+h, rr);
-    ctx.arcTo(x+w, y+h, x, y+h, rr);
-    ctx.arcTo(x, y+h, x, y, rr);
-    ctx.arcTo(x, y, x+w, y, rr);
-    ctx.closePath();
-  }
-
-  // ========= Rendering =========
-  let lastParsed = null;
-  let lastQ3 = null;
-
-  function validateData(obj){
-    // Minimal validation with helpful messages
-    const errs = [];
-    if(!obj || typeof obj !== "object") errs.push("JSONがオブジェクトではありません。");
-
-    const needStr = (k) => {
-      if(!(k in obj)) errs.push(`"${k}" がありません。`);
-      else if(typeof obj[k] !== "string") errs.push(`"${k}" は文字列にしてください。`);
-    };
-    needStr("title");
-    needStr("situation");
-
-    if(!Array.isArray(obj.schedule)) errs.push(`"schedule" は配列にしてください。`);
-    else {
-      if(obj.schedule.length < 4 || obj.schedule.length > 6) errs.push(`"schedule" は4〜6行にしてください（今は ${obj.schedule.length} 行）。`);
-      obj.schedule.forEach((row, i)=>{
-        if(!row || typeof row !== "object") { errs.push(`schedule[${i}] がオブジェクトではありません。`); return; }
-        ["time","place","note"].forEach(k=>{
-          if(!(k in row)) errs.push(`schedule[${i}].${k} がありません。`);
-          else if(typeof row[k] !== "string") errs.push(`schedule[${i}].${k} は文字列にしてください。`);
-        });
-      });
-    }
-
-    if(!obj.questions || typeof obj.questions !== "object") errs.push(`"questions" がありません。`);
-    else {
-      ["q1","q2","q4"].forEach(k=>{
-        if(typeof obj.questions[k] !== "string") errs.push(`questions.${k} は文字列にしてください。`);
-      });
-      if(typeof obj.questions.q3_target_time !== "string") errs.push(`questions.q3_target_time は "HH:MM" の文字列にしてください。`);
-      else {
-        const t = parseHHMM(obj.questions.q3_target_time);
-        if(!t) errs.push(`questions.q3_target_time の形式が不正です（例 "14:35"）。`);
+    for (let i=0;i<d.table.length;i++){
+      const row = d.table[i];
+      for (const k of ["time","activity","note"]){
+        if (!(k in row)) return `table[${i}] に必須キーがありません: ${k}`;
       }
-      if(!Array.isArray(obj.questions.choices_q4) || obj.questions.choices_q4.length !== 3){
-        errs.push(`questions.choices_q4 は3つの配列にしてください。`);
-      }
+      if (!/^\d{1,2}:\d{2}$/.test(row.time)) return `table[${i}].time は H:MM 形式にしてください（例 9:05）。`;
+    }
+    if (!d.questions || typeof d.questions !== "object") return "questions が不正です。";
+    const qs = ["q1","q2","q3","q4"];
+    for (const q of qs){
+      if (!(q in d.questions)) return `questions に必須キーがありません: ${q}`;
+    }
+    // q3
+    const q3 = d.questions.q3;
+    const needQ3 = ["type","prompt","clockTarget","clockChoices","clockAnswerIndex"];
+    for (const k of needQ3){
+      if (!(k in q3)) return `questions.q3 に必須キーがありません: ${k}`;
+    }
+    if (!Array.isArray(q3.clockChoices) || q3.clockChoices.length !== 4){
+      return "questions.q3.clockChoices は 4つの配列にしてください。";
+    }
+    if (!(Number.isInteger(q3.clockAnswerIndex) && q3.clockAnswerIndex >= 0 && q3.clockAnswerIndex <= 3)){
+      return "questions.q3.clockAnswerIndex は 0〜3 の整数にしてください。";
+    }
+    if (q3.clockChoices[q3.clockAnswerIndex] !== q3.clockTarget){
+      return "questions.q3 の整合性エラー：clockChoices[clockAnswerIndex] が clockTarget と一致していません。";
+    }
+    // 時刻が重複してないか
+    const set = new Set(q3.clockChoices);
+    if (set.size !== 4) return "questions.q3.clockChoices の時刻が重複しています（4つすべて別にしてください）。";
+
+    // q4
+    const q4 = d.questions.q4;
+    const needQ4 = ["type","prompt","choices","answerIndex"];
+    for (const k of needQ4){
+      if (!(k in q4)) return `questions.q4 に必須キーがありません: ${k}`;
+    }
+    if (!Array.isArray(q4.choices) || q4.choices.length !== 3){
+      return "questions.q4.choices は 3つの配列にしてください。";
+    }
+    if (!(Number.isInteger(q4.answerIndex) && q4.answerIndex >= 0 && q4.answerIndex <= 2)){
+      return "questions.q4.answerIndex は 0〜2 の整数にしてください。";
     }
 
-    if(!obj.answers || typeof obj.answers !== "object") errs.push(`"answers" がありません。`);
-    else {
-      ["q1","q2","q3","q4"].forEach(k=>{
-        if(typeof obj.answers[k] !== "string") errs.push(`answers.${k} は文字列にしてください。`);
-      });
-    }
+    // ※『』ルール（軽いチェック：どこかに含まれていればOK）
+    const notesAll = d.table.map(r => String(r.note || "")).join("\n");
+    if (!notesAll.includes("『")) return "注意：表のnoteに『乗り物』が見当たりません（GPTsのルールでは必須）。";
+    if (!notesAll.includes("※")) return "注意：表のnoteに※注釈が見当たりません（GPTsのルールでは必須）。";
 
-    return errs;
+    return "";
   }
 
-  function renderAll(obj){
-    const out = $("output");
-    out.innerHTML = "";
+  // ========== 描画 ==========
+  function render(d){
+    $("outTitle").textContent = d.title || "";
+    $("outScenario").textContent = d.scenario || "";
 
-    const title = document.createElement("h1");
-    title.className = "outTitle";
-    title.textContent = safeText(obj.title);
-
-    const sit = document.createElement("p");
-    sit.className = "outSituation";
-    sit.textContent = safeText(obj.situation);
-
-    out.appendChild(title);
-    out.appendChild(sit);
-
-    // Schedule table
-    const tbl = document.createElement("table");
-    const thead = document.createElement("thead");
-    thead.innerHTML = `
-      <tr>
-        <th style="width:110px">時刻</th>
-        <th>行く場所・すること</th>
-        <th style="width:260px">交通手段や注意点</th>
-      </tr>`;
-    tbl.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-    obj.schedule.forEach(row=>{
-      const tr = document.createElement("tr");
-      const td1 = document.createElement("td"); td1.textContent = safeText(row.time);
-      const td2 = document.createElement("td"); td2.textContent = safeText(row.place);
-      const td3 = document.createElement("td"); td3.textContent = safeText(row.note);
-      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
-      tbody.appendChild(tr);
-    });
-    tbl.appendChild(tbody);
-    out.appendChild(tbl);
+    // table
+    $("outTable").innerHTML = makeTable(d.table);
 
     // Q1
-    out.appendChild(makeQBlock("問1：情報の抽出", obj.questions.q1));
+    $("q1").innerHTML = `
+      <h3 class="qtitle">【問1】情報の抽出</h3>
+      <p class="qtext">${escapeHtml(d.questions.q1.prompt)}</p>
+    `;
 
     // Q2
-    out.appendChild(makeQBlock("問2：時間の計算", obj.questions.q2));
+    $("q2").innerHTML = `
+      <h3 class="qtitle">【問2】時間の計算</h3>
+      <p class="qtext">${escapeHtml(d.questions.q2.prompt)}</p>
+    `;
 
-    // Q3 with clocks
-    const target = parseHHMM(obj.questions.q3_target_time);
-    lastQ3 = generateQ3Choices(target);
+    // Q3 (時計)
+    const letters = ["ア","イ","ウ","エ"];
+    const q3 = d.questions.q3;
+    const clockChoicesHtml = q3.clockChoices.map((t, i) => `
+      <div class="clock-choice">
+        <div class="clock-label">${letters[i]}</div>
+        <div class="clock-time mono">${escapeHtml(t)}</div>
+        <div class="imgph">時計画像<br>（差し替え用）</div>
+      </div>
+    `).join("");
 
-    const q3Block = document.createElement("div");
-    q3Block.className = "qblock";
+    $("q3").innerHTML = `
+      <h3 class="qtitle">【問3】時計の読み</h3>
+      <p class="qtext">${escapeHtml(q3.prompt)}</p>
+      <div class="clockbox">
+        <div class="clock-row">
+          ${clockChoicesHtml}
+        </div>
+        <p class="small">
+          ※ここは「あなたが用意する4つの時計画像（ア〜エ）」を配置する場所です。<br>
+          今は時刻テキストのみ表示しています（clockChoices）。画像に置き換えたい場合は、このHTMLの該当部分に &lt;img&gt; を入れるだけでOKです。
+        </p>
+      </div>
+    `;
 
-    const q3Head = document.createElement("div");
-    q3Head.className = "qhead";
-    q3Head.textContent = "問3：時計の読み（ア〜エから選ぶ）";
-    q3Block.appendChild(q3Head);
-
-    const q3Body = document.createElement("div");
-    q3Body.className = "qbody";
-    const p = document.createElement("p");
-    p.className = "qtext";
-    p.textContent = `次の活動の時刻は「${pad2(target.hh)}:${pad2(target.mm)}」です。これを示すアナログ時計はどれですか。`;
-    q3Body.appendChild(p);
-
-    const canvasWrap = document.createElement("div");
-    canvasWrap.className = "canvasWrap";
-    const canvasTop = document.createElement("div");
-    canvasTop.className = "canvasTop";
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.innerHTML = `・正解の時刻：<b>${pad2(target.hh)}:${pad2(target.mm)}</b>（※表示はアナログのみ）<br>・ア〜エは毎回シャッフルされます`;
-    const btnRow = document.createElement("div");
-    btnRow.className = "row no-print";
-    const btnRe = document.createElement("button");
-    btnRe.className = "btn secondary";
-    btnRe.textContent = "時計だけ作り直す";
-    btnRe.addEventListener("click", ()=>{
-      lastQ3 = generateQ3Choices(target);
-      renderClockSheet(canvas, lastQ3.choices);
-      // also update answer block if present
-      const ansQ3 = document.getElementById("ansQ3");
-      if(ansQ3) ansQ3.textContent = lastQ3.correctLabel;
-    });
-    btnRow.appendChild(btnRe);
-
-    canvasTop.appendChild(meta);
-    canvasTop.appendChild(btnRow);
-
-    const canvas = document.createElement("canvas");
-    canvas.id = "clockCanvas";
-    canvasWrap.appendChild(canvasTop);
-    canvasWrap.appendChild(canvas);
-
-    q3Body.appendChild(canvasWrap);
-
-    // choices list (text)
-    const choiceList = document.createElement("div");
-    choiceList.className = "choices";
-    lastQ3.choices.forEach(ch=>{
-      const div = document.createElement("div");
-      div.className = "choice";
-      div.textContent = `${ch.label}`;
-      choiceList.appendChild(div);
-    });
-    q3Body.appendChild(choiceList);
-
-    q3Block.appendChild(q3Body);
-    out.appendChild(q3Block);
-
-    // draw clocks
-    renderClockSheet(canvas, lastQ3.choices);
-
-    // Q4 (3-choice)
-    const q4 = document.createElement("div");
-    q4.className = "qblock";
-    q4.innerHTML = `<div class="qhead">問4：マナー・知識（3択）</div>`;
-    const q4Body = document.createElement("div");
-    q4Body.className = "qbody";
-    const q4p = document.createElement("p");
-    q4p.className = "qtext";
-    q4p.textContent = safeText(obj.questions.q4);
-    q4Body.appendChild(q4p);
-
-    const q4Choices = document.createElement("div");
-    q4Choices.className = "choices";
-    const labels3 = ["①","②","③"];
-    (obj.questions.choices_q4 || []).forEach((c, i)=>{
-      const div = document.createElement("div");
-      div.className = "choice";
-      div.textContent = `${labels3[i] || ""} ${safeText(c)}`;
-      q4Choices.appendChild(div);
-    });
-    q4Body.appendChild(q4Choices);
-    q4.appendChild(q4Body);
-    out.appendChild(q4);
+    // Q4 (マナー3択)
+    const q4 = d.questions.q4;
+    $("q4").innerHTML = `
+      <h3 class="qtitle">【問4】マナー・知識（3択）</h3>
+      <p class="qtext">${escapeHtml(q4.prompt)}</p>
+      <div class="choices">
+        ${q4.choices.map((c, i) => `
+          <div class="choice">
+            <div class="badge">${i+1}</div>
+            <div class="choice-main">
+              <p class="choice-line">${escapeHtml(c)}</p>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
 
     // Answers
-    const ans = document.createElement("div");
-    ans.className = "answers";
-    ans.innerHTML = `
-      <h3>解答・ポイント</h3>
-      <p>【問1】${escapeHtml(obj.answers.q1)}<br>
-         【問2】${escapeHtml(obj.answers.q2)}<br>
-         【問3】<span id="ansQ3">${escapeHtml(lastQ3.correctLabel)}</span><br>
-         【問4】${escapeHtml(obj.answers.q4)}
-      </p>
+    const q1a = d.questions.q1.answer;
+    const q2a = d.questions.q2.answer;
+    const q3a = letters[q3.clockAnswerIndex];
+    const q4a = String(q4.answerIndex + 1);
+
+    $("answers").innerHTML = `
+      <p>【問1】正解：<span class="mono">${escapeHtml(q1a)}</span><br>${escapeHtml(d.explanations.q1 || "")}</p>
+      <p>【問2】正解：<span class="mono">${escapeHtml(q2a)}</span><br>${escapeHtml(d.explanations.q2 || "")}</p>
+      <p>【問3】正解：<span class="mono">${q3a}</span>（<span class="mono">${escapeHtml(q3.clockTarget)}</span>）<br>${escapeHtml(d.explanations.q3 || "")}</p>
+      <p>【問4】正解：<span class="mono">${q4a}</span><br>${escapeHtml(d.explanations.q4 || "")}</p>
     `;
-    out.appendChild(ans);
   }
 
-  function makeQBlock(head, text){
-    const box = document.createElement("div");
-    box.className = "qblock";
-    const h = document.createElement("div");
-    h.className = "qhead";
-    h.textContent = head;
-    const b = document.createElement("div");
-    b.className = "qbody";
-    const p = document.createElement("p");
-    p.className = "qtext";
-    p.textContent = safeText(text);
-    b.appendChild(p);
-    box.appendChild(h);
-    box.appendChild(b);
-    return box;
+  function makeTable(rows){
+    const head = `
+      <table>
+        <thead>
+          <tr>
+            <th class="col-time">時刻</th>
+            <th>行く場所・すること</th>
+            <th>交通手段や注意点</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    const body = rows.map(r => `
+      <tr>
+        <td class="col-time mono">${escapeHtml(r.time)}</td>
+        <td>${escapeHtml(r.activity)}</td>
+        <td>${escapeHtml(r.note)}</td>
+      </tr>
+    `).join("");
+    const tail = `</tbody></table>`;
+    return head + body + tail;
   }
 
   function escapeHtml(s){
-    return safeText(s)
+    s = String(s ?? "");
+    return s
       .replaceAll("&","&amp;")
       .replaceAll("<","&lt;")
       .replaceAll(">","&gt;")
       .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
+      .replaceAll("'","&#39;");
   }
 
-  // ========= Buttons =========
-  $("btnSample").addEventListener("click", ()=>{
-    clearError();
-    $("jsonInput").value = JSON.stringify(sampleData(), null, 2);
-  });
-
-  $("btnRender").addEventListener("click", ()=>{
-    clearError();
-    try{
-      const obj = JSON.parse($("jsonInput").value || "null");
-      const errs = validateData(obj);
-      if(errs.length){
-        showError("入力JSONに問題があります：\n- " + errs.join("\n- "));
-        return;
-      }
-      lastParsed = obj;
-      renderAll(obj);
-    }catch(e){
-      showError("JSONの読み取りに失敗しました。\n" + (e && e.message ? e.message : String(e)));
-    }
-  });
-
-  $("btnShuffle").addEventListener("click", ()=>{
-    clearError();
-    if(!lastParsed){
-      showError("先に「表示する」を押して、問題を表示してください。");
-      return;
-    }
-    const t = parseHHMM(lastParsed.questions.q3_target_time);
-    lastQ3 = generateQ3Choices(t);
-    const canvas = document.getElementById("clockCanvas");
-    if(canvas) renderClockSheet(canvas, lastQ3.choices);
-    const ansQ3 = document.getElementById("ansQ3");
-    if(ansQ3) ansQ3.textContent = lastQ3.correctLabel;
-  });
-
-  $("btnPrint").addEventListener("click", ()=> window.print());
-
-  $("btnClear").addEventListener("click", ()=>{
-    clearError();
-    lastParsed = null;
-    lastQ3 = null;
-    $("jsonInput").value = "";
-    $("output").innerHTML = `<p style="margin:0;color:var(--muted);line-height:1.7">
-      右上の「サンプルJSONを入れる」→「表示する」で、動作が確認できます。<br>
-      GPTsのJSONを貼ったら「表示する」を押してください。
-    </p>`;
-  });
-
-  // ========= Sample =========
+  // ========== サンプル ==========
   function sampleData(){
     return {
-      "title": "職場体験の日の予定",
-      "situation": "あなたは職場体験で、地域の図書館に行きます。表を見て、必要な情報を読み取って答えましょう。",
-      "schedule": [
-        {"time":"08:30","place":"学校に集合する","note":"※えんぴつとメモ帳を持つ"},
-        {"time":"08:45","place":"『バス』で図書館へ向かう","note":"『市バス』に乗る。お金は出さない"},
-        {"time":"09:10","place":"図書館であいさつと説明を聞く","note":"静かに聞く"},
-        {"time":"09:30","place":"本の整理をする","note":"走らない"},
-        {"time":"10:20","place":"休けいをする","note":"水分をとる"},
-        {"time":"10:40","place":"返却カウンターの見学をする","note":"※名ふだをつける"}
+      "version":"1.0",
+      "seedHint":"sample",
+      "title":"部活動の大会の日の予定",
+      "scenario":"あなたは部活動の大会に出ます。時間と持ち物を確かめます。",
+      "table":[
+        {"time":"8:10","activity":"学校に集合","note":"※水とうを持つ"},
+        {"time":"8:30","activity":"会場へ移動","note":"『電車』で行く"},
+        {"time":"9:10","activity":"会場に到着・受付","note":"※うわぐつを出す"},
+        {"time":"9:40","activity":"ウォーミングアップ","note":"走り回りすぎない"},
+        {"time":"10:10","activity":"試合開始","note":"先生の話を聞く"}
       ],
-      "questions": {
-        "q1":"表の中で、持ち物として書かれているものを2つ答えなさい。",
-        "q2":"図書館へ向かう『バス』に乗る時刻は08:45です。図書館であいさつと説明を聞く時刻は09:10です。何分かかりますか。",
-        "q3_target_time":"10:40",
-        "q4":"図書館で本を整理するときに、ふさわしい行動はどれですか。",
-        "choices_q4":[
-          "大きな声で友だちと話す",
-          "静かに動いて、本をていねいにあつかう",
-          "走って早く片づける"
-        ]
+      "questions":{
+        "q1":{"type":"extract","prompt":"持っていくものを、表から1つ答えなさい。","answer":"水とう"},
+        "q2":{"type":"time_calc","prompt":"8:30に出発して、9:10に到着しました。何分かかりましたか。","answer":"40分"},
+        "q3":{"type":"clock_choice","prompt":"「試合開始」の時刻をさす時計はどれですか。ア〜エから1つ選びなさい。",
+              "clockTarget":"10:10",
+              "clockChoices":["10:10","10:01","9:10","10:40"],
+              "clockAnswerIndex":0},
+        "q4":{"type":"manners","prompt":"会場でのよい行動はどれですか。1つ選びなさい。",
+              "choices":["走り回ってさわぐ","受付の人にあいさつする","他の人の道具を勝手に使う"],
+              "answerIndex":1}
       },
-      "answers": {
-        "q1":"えんぴつ、メモ帳（※の行に書いてある）",
-        "q2":"25分（08:45→09:10）",
-        "q3":"（自動判定）",
-        "q4":"②（静かに動いて、本をていねいにあつかう）"
+      "explanations":{
+        "q1":"表のnoteに「※水とう」とあります。",
+        "q2":"9:10−8:30なので40分です。",
+        "q3":"表の「試合開始」は10:10です。",
+        "q4":"あいさつは相手に失礼がなく、気持ちよく行動できます。"
       }
     };
   }
-
-  // 初期はサンプルを入れておく（邪魔なら消してOK）
-  $("jsonInput").value = JSON.stringify(sampleData(), null, 2);
+})();
 </script>
 </body>
 </html>
-```
